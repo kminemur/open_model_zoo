@@ -76,7 +76,7 @@ class Display(object):
         m_rider_tweezers = scoring['measuring_score_rider_tweezers']
         m_balance = scoring['measuring_score_balance']
         m_object_left = scoring['measuring_score_object_left']
-        m_weights_right_tweezers = scoring['measuring_score_weights_right_tweezers']
+        m_weights_right_tweezers = scoring['measuring_score_weights_right']
         m_weights_order = scoring['measuring_score_weights_order']
         e_tidy = scoring['end_score_tidy']
 

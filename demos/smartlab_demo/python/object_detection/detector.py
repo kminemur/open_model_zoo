@@ -162,6 +162,7 @@ class Detector(object):
             sub_detector1 = self.front1_subdetector
             sub_detector2 = self.front2_subdetector
         all_preds = []
+
         for i, sub_detector in enumerate([sub_detector1, sub_detector2]):
             outputs, img_info = sub_detector.inference(img)
             if outputs[0] is not None:
@@ -171,7 +172,11 @@ class Detector(object):
             preds[:, 6] += self.offset_cls_idx[i]
             all_preds.append(preds)
 
-        all_preds = np.concatenate(all_preds)
+        if len(all_preds) > 0:
+            all_preds = np.concatenate(all_preds)
+        else:
+            all_preds = np.zeros((1, 7))
+
 
         # merge same classes from model 2
         for r, pred in enumerate(all_preds):

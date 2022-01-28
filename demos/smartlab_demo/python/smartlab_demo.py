@@ -118,6 +118,8 @@ def main():
             top_det_results, front_det_results = detector.inference(
                     img_top=frame_top, img_front=frame_front)
 
+            print(top_det_results)
+
             # if async_pipeline.is_ready():
             ''' The temporal segmentation module need to self judge and generate segmentation results for all historical frames '''
             if(args.mode == "multiview"):
@@ -139,13 +141,16 @@ def main():
                     continue
     
             ''' The score evaluation module need to merge the results of the two modules and generate the scores '''
-            state, scoring = evaluator.inference(
+            state, scoring, keyframe = evaluator.inference(
                     top_det_results=top_det_results,
                     front_det_results=front_det_results,
-                    top_seg_results=top_seg_results,
-                    front_seg_results=front_seg_results,
+                    action_seg_results=top_seg_results,
                     frame_top=frame_top,
-                    frame_front=frame_front)
+                    frame_front=frame_front,
+                    frame_counter=frame_counter)
+
+            print(state)
+            print(scoring)
 
             current_time=time.time()
             current_frame = frame_counter
@@ -154,7 +159,7 @@ def main():
                 fps = total_frame_processed_in_interval / (current_time - old_time)
                 interval_start_frame = current_frame
                 old_time = current_time
-            print(fps)
+            # print(fps)
 
             display.display_result(
                     frame_top=frame_top,
