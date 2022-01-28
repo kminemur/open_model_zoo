@@ -18,6 +18,7 @@ import numpy as np
 from .preprocess import preprocess
 from .settings import MwGlobalExp
 from .deploy_util import multiclass_nms, demo_postprocess
+from .postprocess import postprocess
 from .subdetectors import SubDetector
 from .vis import vis
 
@@ -163,37 +164,65 @@ class Detector(object):
             sub_detector2 = self.front2_subdetector
         all_preds = []
 
-        for i, sub_detector in enumerate([sub_detector1, sub_detector2]):
-            outputs, img_info = sub_detector.inference(img)
-            if outputs[0] is not None:
-                preds = outputs[0] # work if bsize = 1
-            else:
-                continue
-            preds[:, 6] += self.offset_cls_idx[i]
-            all_preds.append(preds)
+        ### openvino async_mode ###
+        exec_net1, img_info1 = sub_detector1.inference_async(img)
+        exec_net2, img_info2 = sub_detector2.inference_async(img)
 
-        if len(all_preds) > 0:
-            all_preds = np.concatenate(all_preds)
-        else:
-            all_preds = np.zeros((1, 7))
+        while True:
+            if not exec_net1.requests[0].wait() and not exec_net2.requests[0].wait():
+                res1 = exec_net1.requests[0].output_blobs[sub_detector1.onode].buffer
+                res2 = exec_net2.requests[0].output_blobs[sub_detector2.onode].buffer
+
+                outputs1 = demo_postprocess(res1, sub_detector1.input_shape, p6=False)
+                outputs2 = demo_postprocess(res2, sub_detector2.input_shape, p6=False)
+
+                outputs1 = postprocess(
+                    outputs1, sub_detector1.num_classes, sub_detector1.conf_thresh,
+                    sub_detector1.nms_thresh, class_agnostic=True)
+                outputs2 = postprocess(
+                    outputs2, sub_detector2.num_classes, sub_detector2.conf_thresh,
+                    sub_detector2.nms_thresh, class_agnostic=True)
+
+                if outputs1[0] is not None:
+                    preds1 = outputs1[0]
+                    preds1[:, 6] += self.offset_cls_idx[0]
+                    all_preds.append(preds1)
+                if outputs2[0] is not None:
+                    preds2 = outputs2[0]
+                    preds2[:, 6] += self.offset_cls_idx[1]
+                    all_preds.append(preds2)
 
 
-        # merge same classes from model 2
-        for r, pred in enumerate(all_preds):
-            cls_id = int(pred[-1])
-            if cls_id in self.repeat_cls2_ids:
-                all_preds[r, -1] = self.cls2tocls1[cls_id]
+            # for i, sub_detector in enumerate([sub_detector1, sub_detector2]):
+            #     outputs, img_info = sub_detector.inference(img)
+            #     if outputs[0] is not None:
+            #         preds = outputs[0] # work if bsize = 1
+            #     else:
+            #         continue
+            #     preds[:, 6] += self.offset_cls_idx[i]
+            #     all_preds.append(preds)
 
-        # restrict object number for each class
-        all_preds = self._apply_detection_constraints(all_preds)
+                if len(all_preds) > 0:
+                    all_preds = np.concatenate(all_preds)
+                else:
+                    all_preds = np.zeros((1, 7))
 
-        # remap to original image scale
-        ratio = img_info['ratio']
-        bboxes = all_preds[:, :4] / ratio
-        cls = all_preds[:, 6]
-        scores = all_preds[:, 4] * all_preds[:, 5]
+                # merge same classes from model 2
+                for r, pred in enumerate(all_preds):
+                    cls_id = int(pred[-1])
+                    if cls_id in self.repeat_cls2_ids:
+                        all_preds[r, -1] = self.cls2tocls1[cls_id]
 
-        return bboxes, cls, scores
+                # restrict object number for each class
+                all_preds = self._apply_detection_constraints(all_preds)
+
+                # remap to original image scale
+                ratio = img_info1['ratio'] # all ways same?
+                bboxes = all_preds[:, :4] / ratio
+                cls = all_preds[:, 6]
+                scores = all_preds[:, 4] * all_preds[:, 5]
+
+                return bboxes, cls, scores
 
     def pseudo_detect(self, origin_img, input_blob, out_blob, exec_net, h, w, idx_offset:int):
         image, ratio = preprocess(origin_img, (h, w))

@@ -35,6 +35,19 @@ class SubDetector(object):
 
         return outputs, img_info
 
+    def inference_async(self, img):
+        img_info = {"id": 0}
+        height, width = img.shape[:2]
+        img_info["height"] = height
+        img_info["width"] = width
+
+        img_feed, ratio = preprocess(img, self.input_shape)
+        img_info["ratio"] = ratio
+        # res = self.model.infer(inputs={self.inode:img_feed})[self.onode]
+        self.model.requests[0].async_infer(inputs={self.inode:img_feed})
+
+        return self.model, img_info
+
     def visual(self, output, img_info, cls_conf=0.35):
         ratio = img_info["ratio"]
         img = img_info["raw_img"]

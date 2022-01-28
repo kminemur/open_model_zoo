@@ -74,11 +74,6 @@ def main():
             [args.m_frontall, args.m_frontmove],
             False)
 
-    # model = Classification(model_adapter, config)
-    # model.log_layers_info()
-    # async_pipeline = AsyncPipeline(detector)
-
-
     '''Video Segmentation Variables'''
     if(args.mode == "multiview"):
         segmentor = Segmentor(ie, args.m_encoder, args.m_decoder)
@@ -109,48 +104,52 @@ def main():
         frame_counter += 1
         if ret_top and ret_front :
 
-            # if async_pipeline.callback_exceptions:
-            #     raise async_pipeline.callback_exceptions[0]
-            # Process all completed requests
-            # results = async_pipeline.get_result(next_frame_id_to_show)
-
             ''' The object detection module need to generate detection results(for the current frame) '''
             top_det_results, front_det_results = detector.inference(
                     img_top=frame_top, img_front=frame_front)
 
-            print(top_det_results)
+            # ''' The temporal segmentation module need to self judge and generate segmentation results for all historical frames '''
+            # if(args.mode == "multiview"):
+            #     # top_seg_results, front_seg_results = segmentor.inference(
+            #     #         buffer_top=frame_top,
+            #     #         buffer_front=frame_front,
+            #     #         frame_index=frame_counter)
 
-            # if async_pipeline.is_ready():
-            ''' The temporal segmentation module need to self judge and generate segmentation results for all historical frames '''
-            if(args.mode == "multiview"):
-                top_seg_results, front_seg_results = segmentor.inference(
-                        buffer_top=frame_top,
-                        buffer_front=frame_front,
-                        frame_index=frame_counter)
-            elif(args.mode == "mstcn"):
-                buffer1.append(cv2.cvtColor(frame_top, cv2.COLOR_BGR2RGB))
-                buffer2.append(cv2.cvtColor(frame_front, cv2.COLOR_BGR2RGB))
+            #     top_seg_results, front_seg_results = segmentor.inference_async(
+            #             buffer_top=frame_top,
+            #             buffer_front=frame_front,
+            #             frame_index=frame_counter)
+            # elif(args.mode == "mstcn"):
+            #     buffer1.append(cv2.cvtColor(frame_top, cv2.COLOR_BGR2RGB))
+            #     buffer2.append(cv2.cvtColor(frame_front, cv2.COLOR_BGR2RGB))
 
-                frame_predictions = segmentor.inference(
-                        buffer_top=buffer1,
-                        buffer_front=buffer2,
-                        frame_index=frame_counter)
-                top_seg_results = frame_predictions
-                front_seg_results = frame_predictions
-                if(len(top_seg_results) == 0):
-                    continue
-    
-            ''' The score evaluation module need to merge the results of the two modules and generate the scores '''
-            state, scoring, keyframe = evaluator.inference(
-                    top_det_results=top_det_results,
-                    front_det_results=front_det_results,
-                    action_seg_results=top_seg_results,
-                    frame_top=frame_top,
-                    frame_front=frame_front,
-                    frame_counter=frame_counter)
+            #     frame_predictions = segmentor.inference(
+            #             buffer_top=buffer1,
+            #             buffer_front=buffer2,
+            #             frame_index=frame_counter)
+            #     top_seg_results = frame_predictions
+            #     front_seg_results = frame_predictions
+            #     if(len(top_seg_results) == 0):
+            #         continue
 
-            print(state)
-            print(scoring)
+
+            # get_item_to_infer()
+            # get_unused_request_id()
+            # launch_infer()
+            # do_someting()
+            # if results_available():
+            #     pass
+            # ''' The score evaluation module need to merge the results of the two modules and generate the scores '''
+            # state, scoring, keyframe = evaluator.inference(
+            #         top_det_results=top_det_results,
+            #         front_det_results=front_det_results,
+            #         action_seg_results=top_seg_results,
+            #         frame_top=frame_top,
+            #         frame_front=frame_front,
+            #         frame_counter=frame_counter)
+
+            # print(state)
+            # print(scoring)
 
             current_time=time.time()
             current_frame = frame_counter
@@ -159,19 +158,19 @@ def main():
                 fps = total_frame_processed_in_interval / (current_time - old_time)
                 interval_start_frame = current_frame
                 old_time = current_time
-            # print(fps)
+            print(fps)
 
-            display.display_result(
-                    frame_top=frame_top,
-                    frame_front=frame_front,
-                    front_seg_results=front_seg_results,
-                    top_seg_results=top_seg_results,
-                    top_det_results=top_det_results,
-                    front_det_results=front_det_results,
-                    scoring=scoring,
-                    state=state,
-                    frame_counter=frame_counter,
-                    fps=fps)
+            # display.display_result(
+            #         frame_top=frame_top,
+            #         frame_front=frame_front,
+            #         front_seg_results=front_seg_results,
+            #         top_seg_results=top_seg_results,
+            #         top_det_results=top_det_results,
+            #         front_det_results=front_det_results,
+            #         scoring=scoring,
+            #         state=state,
+            #         frame_counter=frame_counter,
+            #         fps=fps)
 
         # else:
             # Wait for empty request

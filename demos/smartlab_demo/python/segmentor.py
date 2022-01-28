@@ -15,6 +15,7 @@
 """
 
 import cv2
+import time
 import numpy as np
 import logging as log
 from collections import deque
@@ -96,6 +97,45 @@ class Segmentor(object):
         predicted = isAction * (np.argmax(output.squeeze()[1:]) + 1)
 
         return self.terms[predicted], self.terms[predicted]
+
+
+    def inference_async(self, buffer_top, buffer_front, frame_index):\
+        ### preprocess ###
+        buffer_front = buffer_front[120:, :, :] # remove date characters
+        buffer_top = buffer_top[120:, :, :] # remove date characters
+        buffer_front = cv2.resize(buffer_front, (224, 224), interpolation=cv2.INTER_LINEAR)
+        buffer_top = cv2.resize(buffer_top, (224, 224), interpolation=cv2.INTER_LINEAR)
+        buffer_front = buffer_front / 255
+        buffer_top = buffer_top / 255
+
+        buffer_front = buffer_front[np.newaxis, :, :, :].transpose((0, 3, 1, 2)).astype(np.float32)
+        buffer_top = buffer_top[np.newaxis, :, :, :].transpose((0, 3, 1, 2)).astype(np.float32)
+
+        ### async ###
+        self.encFront.requests[0].async_infer(inputs={self.encFront_input_keys[0]: buffer_front, 
+            self.encFront_input_keys[1]: self.shifted_tesor_front})
+
+        self.encTop.requests[0].async_infer(inputs={self.encTop_input_keys[0]: buffer_top, 
+            self.encTop_input_keys[1]: self.shifted_tesor_top})
+
+        while True:
+            if not self.encFront.requests[0].wait() and not self.encTop.requests[0].wait():
+                feature_vector_front = self.encFront.requests[0].output_blobs[self.encFront_output_key[0]].buffer
+                self.shifted_tesor_front = self.encFront.requests[0].output_blobs[self.encFront_output_key[1]].buffer
+
+                feature_vector_top = self.encTop.requests[0].output_blobs[self.encTop_output_key[0]].buffer
+                self.shifted_tesor_top = self.encTop.requests[0].output_blobs[self.encTop_output_key[1]].buffer
+
+                output = self.classifier.infer(inputs={
+                    self.classifier_input_keys[0]: feature_vector_front,
+                    self.classifier_input_keys[1]: feature_vector_top}
+                )[self.classifier_output_key[0]]
+
+                ### yoclo classifier ###
+                isAction = (output.squeeze()[0] >= .5).astype(int)
+                predicted = isAction * (np.argmax(output.squeeze()[1:]) + 1)
+
+                return self.terms[predicted], self.terms[predicted]
 
 
 class SegmentorMstcn(object):
