@@ -14,6 +14,10 @@ class SubDetector(object):
         self.conf_thresh = exp.conf_thresh
         self.nms_thresh = exp.nms_thresh
 
+        # for async mode
+        # self.exec_net = exp.exec_net
+        # self.empty_requests = exp.empty_requests
+
     def inference(self, img):
         img_info = {"id": 0}
         height, width = img.shape[:2]

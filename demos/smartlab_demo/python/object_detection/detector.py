@@ -253,4 +253,29 @@ class Detector(object):
             return vis_top, vis_front
         else:
             return [top_bboxes, top_cls_ids, top_scores], [front_bboxes, front_cls_ids, front_scores]
-            
+
+    # # for async mode
+    # def infer_sync(self, dict_data):
+    #     return self.exec_net.infer(dict_data)
+
+    # def infer_async(self, dict_data, callback_fn, callback_data):
+
+    #     def get_raw_result(request):
+    #         raw_result = {key: blob.buffer for key, blob in request.output_blobs.items()}
+    #         self.empty_requests.append(request)
+    #         return raw_result
+
+    #     request = self.empty_requests.popleft()
+    #     request.set_completion_callback(py_callback=callback_fn,
+    #                                     py_data=(get_raw_result, request, callback_data))
+    #     request.async_infer(dict_data)
+
+    # def is_ready(self):
+    #     return len(self.empty_requests) != 0
+
+    # def await_all(self):
+    #     for request in self.exec_net.requests:
+    #         request.wait()
+
+    # def await_any(self):
+    #     self.exec_net.wait(num_requests=1)

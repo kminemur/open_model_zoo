@@ -13,7 +13,7 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 """
-
+import sys
 import cv2
 import time
 from collections import deque
@@ -23,6 +23,12 @@ from segmentor import Segmentor, SegmentorMstcn
 from evaluator import Evaluator
 from display import Display
 from openvino.inference_engine import IECore
+
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parents[2] / 'common/python/openvino/model_zoo'))
+from model_api.models import Classification
+from model_api.pipelines import AsyncPipeline
+
 
 def build_argparser():
     parser = ArgumentParser(add_help=False)
@@ -68,6 +74,11 @@ def main():
             [args.m_frontall, args.m_frontmove],
             False)
 
+    # model = Classification(model_adapter, config)
+    # model.log_layers_info()
+    # async_pipeline = AsyncPipeline(detector)
+
+
     '''Video Segmentation Variables'''
     if(args.mode == "multiview"):
         segmentor = Segmentor(ie, args.m_encoder, args.m_decoder)
@@ -95,15 +106,19 @@ def main():
         ret_top, frame_top = cap_top.read()  # frame:480 x 640 x 3
         ret_front, frame_front = cap_front.read()
 
-        if ret_top and ret_front:
-            frame_counter += 1
+        frame_counter += 1
+        if ret_top and ret_front :
 
+            # if async_pipeline.callback_exceptions:
+            #     raise async_pipeline.callback_exceptions[0]
+            # Process all completed requests
+            # results = async_pipeline.get_result(next_frame_id_to_show)
 
             ''' The object detection module need to generate detection results(for the current frame) '''
             top_det_results, front_det_results = detector.inference(
                     img_top=frame_top, img_front=frame_front)
-            
 
+            # if async_pipeline.is_ready():
             ''' The temporal segmentation module need to self judge and generate segmentation results for all historical frames '''
             if(args.mode == "multiview"):
                 top_seg_results, front_seg_results = segmentor.inference(
@@ -139,6 +154,7 @@ def main():
                 fps = total_frame_processed_in_interval / (current_time - old_time)
                 interval_start_frame = current_frame
                 old_time = current_time
+            print(fps)
 
             display.display_result(
                     frame_top=frame_top,
@@ -152,8 +168,12 @@ def main():
                     frame_counter=frame_counter,
                     fps=fps)
 
-            if cv2.waitKey(1) in {ord('q'), ord('Q'), 27}: # Esc
-                break
+        # else:
+            # Wait for empty request
+            # async_pipeline.await_any()
+
+        if cv2.waitKey(1) in {ord('q'), ord('Q'), 27}: # Esc
+            break
 
 if __name__ == "__main__":
     main()

@@ -33,15 +33,24 @@ class Segmentor(object):
             "adjust_rider",
         ]
 
+        # Front encoder
         net = ie.read_network(self.backbone_path)
-        self.backbone = ie.load_network(network=net, device_name="CPU")
-        self.backbone_input_keys = list(self.backbone.input_info.keys())
-        self.backbone_output_key = list(self.backbone.outputs.keys())
+        self.encFront = ie.load_network(network=net, device_name="CPU")
+        self.encFront_input_keys = list(self.encFront.input_info.keys())
+        self.encFront_output_key = list(self.encFront.outputs.keys())
+        # Top encoder
+        net = ie.read_network(self.backbone_path)
+        self.encTop = ie.load_network(network=net, device_name="CPU")
+        self.encTop_input_keys = list(self.encTop.input_info.keys())
+        self.encTop_output_key = list(self.encTop.outputs.keys())
+        # Decoder
         net = ie.read_network(self.classifier_path)
         self.classifier = ie.load_network(network=net, device_name="CPU")
         self.classifier_input_keys = list(self.classifier.input_info.keys())
         self.classifier_output_key = list(self.classifier.outputs.keys())
 
+        self.shifted_tesor_front = np.zeros(85066)
+        self.shifted_tesor_top = np.zeros(85066)
 
     def inference(self, buffer_top, buffer_front, frame_index):
         """
@@ -65,10 +74,17 @@ class Segmentor(object):
         buffer_top = buffer_top[np.newaxis, :, :, :].transpose((0, 3, 1, 2)).astype(np.float32)
 
         ### run ###
-        feature_vector_front = self.backbone.infer(
-            inputs={self.backbone_input_keys[0]: buffer_front})[self.backbone_output_key[0]]
-        feature_vector_top = self.backbone.infer(
-            inputs={self.backbone_input_keys[0]: buffer_top})[self.backbone_output_key[0]]
+        out = self.encFront.infer(
+            inputs={self.encFront_input_keys[0]: buffer_front, 
+            self.encFront_input_keys[1]: self.shifted_tesor_front})
+        feature_vector_front = out[self.encFront_output_key[0]]
+        self.shifted_tesor_front = out[self.encFront_output_key[1]]
+
+        out = self.encTop.infer(
+            inputs={self.encTop_input_keys[0]: buffer_top, 
+            self.encTop_input_keys[1]: self.shifted_tesor_top})
+        feature_vector_top = out[self.encTop_output_key[0]]
+        self.shifted_tesor_top = out[self.encTop_output_key[1]]
 
         output = self.classifier.infer(inputs={
             self.classifier_input_keys[0]: feature_vector_front,

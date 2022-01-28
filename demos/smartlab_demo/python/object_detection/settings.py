@@ -15,6 +15,8 @@
  limitations under the License.
 """
 
+from collections import deque
+
 # class maps
 mw_glb2acls6 = (
   "balance",
@@ -73,6 +75,10 @@ class MwGlobalExp:
 
     def get_openvino_model(self, device='CPU'):
         net = self.ie.read_network(self.fp_model)
+
+        # # make class variable for async
+        # self.exec_net = net
+        # self.empty_requests = deque(self.exec_net.requests)
 
         input_name = next(iter(net.input_info))
         output_name = next(iter(net.outputs))
