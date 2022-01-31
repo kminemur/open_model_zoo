@@ -145,11 +145,6 @@ class Segmentor(object):
         return predicrted_top, predicrted_front
 
 
-
-
-
-
-
 class SegmentorMstcn(object):
     def __init__(self, ie, i3d_path, mstcn_path):
         self.embed_model = 0

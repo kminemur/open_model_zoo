@@ -99,7 +99,11 @@ def main():
         Process the video.
     """
     cap_top = cv2.VideoCapture(args.topview)
+    if not cap_top.isOpened(): 
+        raise ValueError(f"Can't read an video or frame from {args.topview}")
     cap_front = cv2.VideoCapture(args.frontview)
+    if not cap_front.isOpened(): 
+        raise ValueError(f"Can't read an video or frame from {args.frontview}")
 
     old_time = time.time()
     fps = 0.0
@@ -115,9 +119,19 @@ def main():
 
             # creat detector thread and segmentor thread
             tdetector = ThreadWithReturnValue(
-                target=detector.inference_async_api, args=(frame_top, frame_front,))
-            tsegmentor = ThreadWithReturnValue(
-                target=segmentor.inference_async_api, args=(frame_top, frame_front, frame_counter,))
+                target=detector.inference_async_api,
+                args=(frame_top, frame_front,))
+            if(args.mode == "multiview"): # mobilenet
+                tsegmentor = ThreadWithReturnValue(
+                    target=segmentor.inference_async_api,
+                    args=(frame_top, frame_front, frame_counter,))
+            else: # mstcn
+                buffer1.append(cv2.cvtColor(frame_top, cv2.COLOR_BGR2RGB))
+                buffer2.append(cv2.cvtColor(frame_front, cv2.COLOR_BGR2RGB))
+                tsegmentor = ThreadWithReturnValue(
+                    target=segmentor.inference,
+                    args=(buffer1, buffer2, frame_counter,))
+
             # start()
             tdetector.start()
             tsegmentor.start()
@@ -125,37 +139,10 @@ def main():
             detector_result = tdetector.join()
             top_det_results, front_det_results = detector_result[0], detector_result[1]
             segmentor_result = tsegmentor.join()
-            top_seg_results, front_seg_results = segmentor_result[0], segmentor_result[1]
-
-            # ''' The object detection module need to generate detection results(for the current frame) '''
-            # top_det_results, front_det_results = detector.inference_async(
-            #         img_top=frame_top, img_front=frame_front)
-
-            # ''' The temporal segmentation module need to self judge and generate segmentation results for all historical frames '''
-
-            # if(args.mode == "multiview"):
-            #     # top_seg_results, front_seg_results = segmentor.inference(
-            #     #         buffer_top=frame_top,
-            #     #         buffer_front=frame_front,
-            #     #         frame_index=frame_counter)
-
-            #     top_seg_results, front_seg_results = segmentor.inference_async(
-            #             buffer_top=frame_top,
-            #             buffer_front=frame_front,
-            #             frame_index=frame_counter)
-
-            # elif(args.mode == "mstcn"):
-            #     buffer1.append(cv2.cvtColor(frame_top, cv2.COLOR_BGR2RGB))
-            #     buffer2.append(cv2.cvtColor(frame_front, cv2.COLOR_BGR2RGB))
-
-            #     frame_predictions = segmentor.inference(
-            #             buffer_top=buffer1,
-            #             buffer_front=buffer2,
-            #             frame_index=frame_counter)
-            #     top_seg_results = frame_predictions
-            #     front_seg_results = frame_predictions
-            #     if(len(top_seg_results) == 0):
-            #         continue
+            if(args.mode == "multiview"):
+                top_seg_results, front_seg_results = segmentor_result[0], segmentor_result[1]
+            else:
+                top_seg_results, front_seg_results = segmentor_result, segmentor_result
 
             ''' The score evaluation module need to merge the results of the two modules and generate the scores '''
             state, scoring, keyframe = evaluator.inference(
