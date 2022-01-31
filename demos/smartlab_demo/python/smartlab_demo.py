@@ -139,6 +139,7 @@ def main():
             detector_result = tdetector.join()
             top_det_results, front_det_results = detector_result[0], detector_result[1]
             segmentor_result = tsegmentor.join()
+            print(segmentor_result)
             if(args.mode == "multiview"):
                 top_seg_results, front_seg_results = segmentor_result[0], segmentor_result[1]
             else:
