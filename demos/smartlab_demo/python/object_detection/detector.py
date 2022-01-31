@@ -14,6 +14,7 @@
  limitations under the License.
 """
 
+from tkinter import E
 import numpy as np
 from .preprocess import preprocess
 from .settings import MwGlobalExp
@@ -163,16 +164,63 @@ class Detector(object):
             sub_detector1 = self.front1_subdetector
             sub_detector2 = self.front2_subdetector
         all_preds = []
+        for i, sub_detector in enumerate([sub_detector1, sub_detector2]):
+            outputs, img_info = sub_detector.inference(img)
+            if outputs[0] is not None:
+                preds = outputs[0] # work if bsize = 1
+            else:
+                continue
+            preds[:, 6] += self.offset_cls_idx[i]
+            all_preds.append(preds)
+
+        all_preds = np.concatenate(all_preds)
+
+        # merge same classes from model 2
+        for r, pred in enumerate(all_preds):
+            cls_id = int(pred[-1])
+            if cls_id in self.repeat_cls2_ids:
+                all_preds[r, -1] = self.cls2tocls1[cls_id]
+
+        # restrict object number for each class
+        all_preds = self._apply_detection_constraints(all_preds)
+
+        # remap to original image scale
+        ratio = img_info['ratio']
+        bboxes = all_preds[:, :4] / ratio
+        cls = all_preds[:, 6]
+        scores = all_preds[:, 4] * all_preds[:, 5]
+
+        return bboxes, cls, scores
+
+    def _detect_one_async(self, img, view='top'):
+        if view == 'top': # top view
+            sub_detector1 = self.top1_subdetector
+            sub_detector2 = self.top2_subdetector
+        else: # front view
+            sub_detector1 = self.front1_subdetector
+            sub_detector2 = self.front2_subdetector
 
         ### openvino async_mode ###
         exec_net1, img_info1 = sub_detector1.inference_async(img)
         exec_net2, img_info2 = sub_detector2.inference_async(img)
 
+        return exec_net1, exec_net2, img_info1
+
+    def _detect_one_wait(self, exec_net1, exec_net2, img_info, view='top'):
+        if view == 'top': # top view
+            sub_detector1 = self.top1_subdetector
+            sub_detector2 = self.top2_subdetector
+        else: # front view
+            sub_detector1 = self.front1_subdetector
+            sub_detector2 = self.front2_subdetector
+
+        all_preds = []
         while True:
             if not exec_net1.requests[0].wait() and not exec_net2.requests[0].wait():
                 res1 = exec_net1.requests[0].output_blobs[sub_detector1.onode].buffer
                 res2 = exec_net2.requests[0].output_blobs[sub_detector2.onode].buffer
 
+                import time
                 outputs1 = demo_postprocess(res1, sub_detector1.input_shape, p6=False)
                 outputs2 = demo_postprocess(res2, sub_detector2.input_shape, p6=False)
 
@@ -192,16 +240,6 @@ class Detector(object):
                     preds2[:, 6] += self.offset_cls_idx[1]
                     all_preds.append(preds2)
 
-
-            # for i, sub_detector in enumerate([sub_detector1, sub_detector2]):
-            #     outputs, img_info = sub_detector.inference(img)
-            #     if outputs[0] is not None:
-            #         preds = outputs[0] # work if bsize = 1
-            #     else:
-            #         continue
-            #     preds[:, 6] += self.offset_cls_idx[i]
-            #     all_preds.append(preds)
-
                 if len(all_preds) > 0:
                     all_preds = np.concatenate(all_preds)
                 else:
@@ -217,12 +255,13 @@ class Detector(object):
                 all_preds = self._apply_detection_constraints(all_preds)
 
                 # remap to original image scale
-                ratio = img_info1['ratio'] # all ways same?
+                ratio = img_info['ratio'] # all ways same?
                 bboxes = all_preds[:, :4] / ratio
                 cls = all_preds[:, 6]
                 scores = all_preds[:, 4] * all_preds[:, 5]
 
                 return bboxes, cls, scores
+
 
     def pseudo_detect(self, origin_img, input_blob, out_blob, exec_net, h, w, idx_offset:int):
         image, ratio = preprocess(origin_img, (h, w))
@@ -260,8 +299,17 @@ class Detector(object):
         Returns:
         prediction results for the two images
         """
-        top_bboxes, top_cls_ids, top_scores = self._detect_one(img_top, view='top')
-        front_bboxes, front_cls_ids, front_scores = self._detect_one(img_front, view='front')
+
+        ### sync mode ###
+        # top_bboxes, top_cls_ids, top_scores = self._detect_one(img_top, view='top')
+        # front_bboxes, front_cls_ids, front_scores = self._detect_one(img_front, view='front')
+
+        ### Async mode ###
+        exec_net1, exec_net2, img_info1 = self._detect_one_async(img_top, view='top')
+        exec_net3, exec_net4, img_info2 = self._detect_one_async(img_front, view='front')
+
+        top_bboxes, top_cls_ids, top_scores = self._detect_one_wait(exec_net1, exec_net2, img_info1, view='top')
+        front_bboxes, front_cls_ids, front_scores = self._detect_one_wait(exec_net3, exec_net4, img_info2, view='front')
 
         # get class string
         top_cls_ids = [ self.classes[int(x)] for x in top_cls_ids ]
