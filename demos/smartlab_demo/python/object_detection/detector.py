@@ -23,7 +23,6 @@ from .postprocess import postprocess
 from .subdetectors import SubDetector
 from .vis import vis
 
-
 class Detector(object):
     def __init__(self,
         ie,
@@ -301,15 +300,8 @@ class Detector(object):
         """
 
         ### sync mode ###
-        # top_bboxes, top_cls_ids, top_scores = self._detect_one(img_top, view='top')
-        # front_bboxes, front_cls_ids, front_scores = self._detect_one(img_front, view='front')
-
-        ### Async mode ###
-        exec_net1, exec_net2, img_info1 = self._detect_one_async(img_top, view='top')
-        exec_net3, exec_net4, img_info2 = self._detect_one_async(img_front, view='front')
-
-        top_bboxes, top_cls_ids, top_scores = self._detect_one_wait(exec_net1, exec_net2, img_info1, view='top')
-        front_bboxes, front_cls_ids, front_scores = self._detect_one_wait(exec_net3, exec_net4, img_info2, view='front')
+        top_bboxes, top_cls_ids, top_scores = self._detect_one(img_top, view='top')
+        front_bboxes, front_cls_ids, front_scores = self._detect_one(img_front, view='front')
 
         # get class string
         top_cls_ids = [ self.classes[int(x)] for x in top_cls_ids ]
@@ -336,28 +328,51 @@ class Detector(object):
         else:
             return [top_bboxes, top_cls_ids, top_scores], [front_bboxes, front_cls_ids, front_scores]
 
-    # # for async mode
-    # def infer_sync(self, dict_data):
-    #     return self.exec_net.infer(dict_data)
+    def inference_async(self, img_top, img_front):
+        """
+        todo Given input arrays for two view, need to generate and save the corresponding detection results
+            in the specific data structure.
+        Args:
+        img_top: img array of H x W x C for the top view
+        img_front: img_array of H x W x C for the front view
 
-    # def infer_async(self, dict_data, callback_fn, callback_data):
+        Returns:
+        prediction results for the two images
+        """
 
-    #     def get_raw_result(request):
-    #         raw_result = {key: blob.buffer for key, blob in request.output_blobs.items()}
-    #         self.empty_requests.append(request)
-    #         return raw_result
+        ### Async mode ###
+        exec_net1, exec_net2, img_info1 = self._detect_one_async(img_top, view='top')
+        exec_net3, exec_net4, img_info2 = self._detect_one_async(img_front, view='front')
 
-    #     request = self.empty_requests.popleft()
-    #     request.set_completion_callback(py_callback=callback_fn,
-    #                                     py_data=(get_raw_result, request, callback_data))
-    #     request.async_infer(dict_data)
+        top_bboxes, top_cls_ids, top_scores = self._detect_one_wait(exec_net1, exec_net2, img_info1, view='top')
+        front_bboxes, front_cls_ids, front_scores = self._detect_one_wait(exec_net3, exec_net4, img_info2, view='front')
 
-    # def is_ready(self):
-    #     return len(self.empty_requests) != 0
+        # get class string
+        top_cls_ids = [ self.classes[int(x)] for x in top_cls_ids ]
+        front_cls_ids = [ self.classes[int(x)] for x in front_cls_ids ]
 
-    # def await_all(self):
-    #     for request in self.exec_net.requests:
-    #         request.wait()
+        # return [], []
+        if self.is_show:
+            vis_top = vis(
+                img_top, 
+                top_bboxes, 
+                top_scores, 
+                top_cls_ids, 
+                self.top1_exp.confthre, 
+                self.classes)
+            vis_front = vis(
+                img_front, 
+                front_bboxes, 
+                front_scores, 
+                front_cls_ids, 
+                self.front1_exp.confthre, 
+                self.classes)
+            return vis_top, vis_front
+        else:
+            return [top_bboxes, top_cls_ids, top_scores], [front_bboxes, front_cls_ids, front_scores]
 
-    # def await_any(self):
-    #     self.exec_net.wait(num_requests=1)
+    def inference_async_api(self, img_top, img_front):
+        top_det_results, front_det_results = \
+            self.inference_async(img_top, img_front)
+
+        return top_det_results, front_det_results

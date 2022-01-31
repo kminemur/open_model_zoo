@@ -22,6 +22,7 @@ from collections import deque
 from scipy.special import softmax
 from openvino.inference_engine import IECore
 
+import asyncio
 
 class Segmentor(object):
     def __init__(self, ie, backbone_path, classifier_path):
@@ -136,6 +137,17 @@ class Segmentor(object):
                 predicted = isAction * (np.argmax(output.squeeze()[1:]) + 1)
 
                 return self.terms[predicted], self.terms[predicted]
+
+    def inference_async_api(self, buffer_top, buffer_front, frame_index):
+        predicrted_top, predicrted_front = \
+            self.inference_async(buffer_top, buffer_front, frame_index)
+
+        return predicrted_top, predicrted_front
+
+
+
+
+
 
 
 class SegmentorMstcn(object):
