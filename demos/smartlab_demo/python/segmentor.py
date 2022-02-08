@@ -15,14 +15,12 @@
 """
 
 import cv2
-import time
 import numpy as np
 import logging as log
 from collections import deque
 from scipy.special import softmax
 from openvino.inference_engine import IECore
 
-import asyncio
 
 class Segmentor(object):
     def __init__(self, ie, backbone_path, classifier_path):
