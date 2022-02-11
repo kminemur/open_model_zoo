@@ -181,13 +181,11 @@ class SegmentorMstcn:
         self.mstcn_output_key = list(self.mstcn.outputs.keys())
         self.mstcn_net.reshape({'input': (1, 2560, 1)})
         self.reshape_mstcn = ie.load_network(network=self.mstcn_net, device_name=device)
-        # init_his_feature = np.load('init_his.npz')
-        # print(init_his_feature)
-        # self.his_fea = [init_his_feature['arr_0'],
-        #                 init_his_feature['arr_1'],
-        #                 init_his_feature['arr_2'],
-        #                 init_his_feature['arr_3']]
-        self.his_fea = []
+        init_his_feature = np.load('init_his.npz')
+        self.his_fea = [init_his_feature['arr_0'],
+                        init_his_feature['arr_1'],
+                        init_his_feature['arr_2'],
+                        init_his_feature['arr_3']]
 
     def inference(self, buffer_top, buffer_side, frame_index):
         """

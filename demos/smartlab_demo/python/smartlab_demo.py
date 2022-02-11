@@ -121,30 +121,6 @@ def main():
         if not ret_top or not ret_side:
             break
         else:
-            ### Sequential mode ###
-            # ''' The object detection module need to generate detection results(for the current frame) '''
-            # top_det_results, side_det_results = detector.inference(
-            #         img_top = frame_top, img_side = frame_side)
-
-            # ''' The temporal segmentation module need to self judge and generate segmentation results for all historical frames '''
-            # if(args.mode == "multiview"):
-            #     top_seg_results, side_seg_results = segmentor.inference_async_api(
-            #             buffer_top = frame_top,
-            #             buffer_side = frame_side,
-            #             frame_index = frame_counter)
-            # elif(args.mode == "mstcn"):
-            #     buffer1.append(cv2.cvtColor(frame_top, cv2.COLOR_BGR2RGB))
-            #     buffer2.append(cv2.cvtColor(frame_side, cv2.COLOR_BGR2RGB))
-
-            #     frame_predictions = segmentor.inference(
-            #             buffer_top = buffer1,
-            #             buffer_side = buffer2,
-            #             frame_index = frame_counter)
-            #     top_seg_results = frame_predictions
-            #     side_seg_results = frame_predictions
-            #     if(len(top_seg_results) == 0):
-            #         continue
-
             # load segment gt
             # imgName = f"frame{frame_counter:05d}.jpg"
             # side_seg_results = frame_dict[imgName]
