@@ -67,13 +67,8 @@ def build_argparser():
     args.add_argument('-m_sa', '--m_sideall', help='Required. Path to sidetview all class model.', required=True, type=str)
     args.add_argument('-m_sm', '--m_sidemove', help='Required. Path to sidetview moving class model.', required=True, type=str)
     args.add_argument('--mode', default='multiview', help='Optional. action recognition mode: multiview or mstcn', type=str)
-    subparsers = parser.add_subparsers(help='add sub-command parser for multiview mode and mstcn mode')
-    args_mutiview = subparsers.add_parser('multiview', help='sub-command for multiview action recognition mode')
-    args_mutiview.add_argument('-m_en', '--m_encoder', help='Required. Path to encoder model.', required=True, type=str)
-    args_mutiview.add_argument('-m_de', '--m_decoder', help='Required. Path to decoder model.', required=True, type=str)
-    args_mstcn = subparsers.add_parser('mstcn', help='sub-command for mstcn action recognition mode')
-    args_mstcn.add_argument('-m_i3d', '--m_i3d', help='Required. Path to i3d model.', required=True, type=str)
-    args_mstcn.add_argument('-m_mstcn', '--m_mstcn', help='Required. Path to mstcn model.', required=True, type=str)
+    args.add_argument('-m_en', '--m_encoder', help='Required. Path to encoder model.', required=True, type=str)
+    args.add_argument('-m_de', '--m_decoder', help='Required. Path to decoder model.', required=True, type=str)
 
     return parser
 
@@ -96,7 +91,7 @@ def main():
     if(args.mode == "multiview"):
         segmentor = Segmentor(ie, args.device, args.m_encoder, args.m_decoder)
     elif(args.mode == "mstcn"):
-        segmentor = SegmentorMstcn(ie, args.device, args.m_i3d, args.m_mstcn)
+        segmentor = SegmentorMstcn(ie, args.device, args.m_encoder, args.m_decoder)
 
     '''Score Evaluation Variables'''
     evaluator = Evaluator()
@@ -127,33 +122,33 @@ def main():
         if not ret_top or not ret_side:
             break
         else:
-            ''' The object detection module need to generate detection results(for the current frame) '''
-            top_det_results, side_det_results = detector.inference(
-                    img_top = frame_top, img_side = frame_side)
+            # ''' The object detection module need to generate detection results(for the current frame) '''
+            # top_det_results, side_det_results = detector.inference(
+            #         img_top = frame_top, img_side = frame_side)
 
-            # ''' The temporal segmentation module need to self judge and generate segmentation results for all historical frames '''
-            # if(args.mode == "multiview"):
-            #     top_seg_results, side_seg_results = segmentor.inference_async_api(
-            #             buffer_top = frame_top,
-            #             buffer_side = frame_side,
-            #             frame_index = frame_counter)
-            # elif(args.mode == "mstcn"):
-            #     buffer1.append(cv2.cvtColor(frame_top, cv2.COLOR_BGR2RGB))
-            #     buffer2.append(cv2.cvtColor(frame_side, cv2.COLOR_BGR2RGB))
+            ''' The temporal segmentation module need to self judge and generate segmentation results for all historical frames '''
+            if(args.mode == "multiview"):
+                top_seg_results, side_seg_results = segmentor.inference_async_api(
+                        buffer_top = frame_top,
+                        buffer_side = frame_side,
+                        frame_index = frame_counter)
+            elif(args.mode == "mstcn"):
+                buffer1.append(cv2.cvtColor(frame_top, cv2.COLOR_BGR2RGB))
+                buffer2.append(cv2.cvtColor(frame_side, cv2.COLOR_BGR2RGB))
 
-            #     frame_predictions = segmentor.inference(
-            #             buffer_top = buffer1,
-            #             buffer_side = buffer2,
-            #             frame_index = frame_counter)
-            #     top_seg_results = frame_predictions
-            #     side_seg_results = frame_predictions
-            #     if(len(top_seg_results) == 0):
-            #         continue
+                frame_predictions = segmentor.inference(
+                        buffer_top = buffer1,
+                        buffer_side = buffer2,
+                        frame_index = frame_counter)
+                top_seg_results = frame_predictions
+                side_seg_results = frame_predictions
+                if(len(top_seg_results) == 0):
+                    continue
 
             # load segment gt
-            imgName = f"frame{frame_counter:05d}.jpg"
-            side_seg_results = frame_dict[imgName]
-            top_seg_results = side_seg_results
+            # imgName = f"frame{frame_counter:05d}.jpg"
+            # side_seg_results = frame_dict[imgName]
+            # top_seg_results = side_seg_results
 
             # # creat detector thread and segmentor thread
             # tdetector = ThreadWithReturnValue(
@@ -183,14 +178,14 @@ def main():
             #         continue
             #     top_seg_results, side_seg_results = segmentor_result, segmentor_result
 
-            ''' The score evaluation module need to merge the results of the two modules and generate the scores '''
-            state, scoring, keyframe = evaluator.inference(
-                    top_det_results=top_det_results,
-                    side_det_results=side_det_results,
-                    action_seg_results=top_seg_results,
-                    frame_top=frame_top,
-                    frame_side=frame_side,
-                    frame_counter=frame_counter)
+            # ''' The score evaluation module need to merge the results of the two modules and generate the scores '''
+            # state, scoring, keyframe = evaluator.inference(
+            #         top_det_results=top_det_results,
+            #         side_det_results=side_det_results,
+            #         action_seg_results=top_seg_results,
+            #         frame_top=frame_top,
+            #         frame_side=frame_side,
+            #         frame_counter=frame_counter)
 
             current_time=time.time()
             current_frame = frame_counter
@@ -201,17 +196,17 @@ def main():
                 old_time = current_time
             print(fps)
 
-            display.display_result(
-                    frame_top = frame_top,
-                    frame_side = frame_side,
-                    side_seg_results = side_seg_results,
-                    top_seg_results = top_seg_results,
-                    top_det_results = top_det_results,
-                    side_det_results = side_det_results,
-                    scoring = scoring,
-                    state = state,
-                    frame_counter = frame_counter,
-                    fps = fps)
+            # display.display_result(
+            #         frame_top = frame_top,
+            #         frame_side = frame_side,
+            #         side_seg_results = side_seg_results,
+            #         top_seg_results = top_seg_results,
+            #         top_det_results = top_det_results,
+            #         side_det_results = side_det_results,
+            #         scoring = scoring,
+            #         state = state,
+            #         frame_counter = frame_counter,
+            #         fps = fps)
 
         if cv2.waitKey(1) in {ord('q'), ord('Q'), 27}: # Esc
             break
