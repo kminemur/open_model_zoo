@@ -7,7 +7,7 @@ class Evaluator:
         '''Score Evaluation Variables'''
         self.frame_counter = 0
         self.top_object_dict = {}
-        self.front_object_dict = {}
+        self.side_object_dict = {}
         self.first_put_take = False
         self.state = "Initial"
         self.buffer_rider = []    # buffer store coordinate of rider and tweezers to detect the move of rider, to evaluate the use of tweezers when adjust rider
@@ -59,14 +59,14 @@ class Evaluator:
 
     def inference(self,
         top_det_results,
-        front_det_results,
+        side_det_results,
         action_seg_results,
-        frame_top, frame_front,
+        frame_top, frame_side,
         frame_counter):
         """
         Args:
             top_det_results:
-            front_det_results:
+            side_det_results:
             action_seg_results:
             action_seg_results:
         Returns:
@@ -76,7 +76,7 @@ class Evaluator:
         self.classify_state(action_seg_results)
 
         self.top_object_dict = self.get_object(det_results = top_det_results)
-        self.front_object_dict = self.get_object(det_results = front_det_results)
+        self.side_object_dict = self.get_object(det_results = side_det_results)
 
         if self.state == "Initial":
             self.evaluate_rider()
@@ -202,7 +202,6 @@ class Evaluator:
         weights_obj_coor = self.top_object_dict['weights']
 
         if len(tray_coor) == 2 and len(weights_obj_coor) > 0:
-
             #compare x_min of 2 tray to locate [left_tray, right_tray] instead of [right_tray,left_tray] 
             if tray_coor[0][0] > tray_coor[1][0]:
                 left_tray = tray_coor[1]
@@ -374,8 +373,8 @@ class Evaluator:
         Function:
             To evaluate whether rider is pushed to zero position
         """
-        roundscrew1_coor = self.front_object_dict['roundscrew1']
-        rider_coor = self.front_object_dict['rider']
+        roundscrew1_coor = self.side_object_dict['roundscrew1']
+        rider_coor = self.side_object_dict['rider']
 
         # only evaluate rider_zero if 2 roundscrew1 and 1 rider are found
         if len(roundscrew1_coor) == 2 and len(rider_coor) == 1:
@@ -421,8 +420,8 @@ class Evaluator:
         Logic:
             if rider moves, tweezers coordinate should within certain pixels (defined in self.use_tweezers_threshold) from the rider coordinate
         """
-        rider_coor = self.front_object_dict['rider']
-        tweezers_coor = self.front_object_dict['tweezers']
+        rider_coor = self.side_object_dict['rider']
+        tweezers_coor = self.side_object_dict['tweezers']
 
         # only evaluate rider_tweezers if 1 rider and 1 tweezers are found
         if len(rider_coor) == 1 and len(tweezers_coor) == 1:

@@ -5,6 +5,7 @@ from .preprocess import preprocess
 from .deploy_util import ov_postorganize
 from .postprocess import postprocess, crop_pad_resize, reverse_crop_pad_resize
 
+
 class SubDetector:
     def __init__(self, exp: MwGlobalExp, all_classes: list):
         self.inode, self.onode, self.input_shape, self.model = exp.get_openvino_model()
@@ -54,19 +55,6 @@ class SubDetector:
         outputs[:, :4] /= ratio
 
         return [outputs]
-
-    # def inference_async(self, img):
-    #     img_info = {"id": 0}
-    #     height, width = img.shape[:2]
-    #     img_info["height"] = height
-    #     img_info["width"] = width
-
-    #     img_feed, ratio = preprocess(img, self.input_shape)
-    #     img_info["ratio"] = ratio
-    #     # res = self.model.infer(inputs={self.inode:img_feed})[self.onode]
-    #     self.model.requests[0].async_infer(inputs={self.inode:img_feed})
-
-    #     return self.model, img_info
 
     def pseudolabel(self, output, img_info, idx_offset, cls_conf = 0.35):
         ratio = img_info["ratio"]

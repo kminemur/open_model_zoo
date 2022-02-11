@@ -104,3 +104,4 @@ def ov_postorganize(outputs, img_size, p6 = False):
     outputs[..., 2: 4] = np.exp(outputs[..., 2: 4]) * expanded_strides
 
     return outputs
+

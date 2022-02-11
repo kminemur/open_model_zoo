@@ -15,12 +15,14 @@
 """
 
 import numpy as np
-from tkinter import E
+import sys
+sys.path.append("..")
 
-from .preprocess import preprocess
+# from .preprocess import preprocess
+from thread_argument import ThreadWithReturnValue
 from .settings import MwGlobalExp
-from .postprocess import postprocess
-from .deploy_util import multiclass_nms
+# from .postprocess import postprocess
+# from .deploy_util import multiclass_nms, ov_postorganize
 from .subdetectors import SubDetector, CascadedSubDetector
 
 
@@ -170,76 +172,6 @@ class Detector:
 
         return bboxes, cls, scores
 
-    # def _detect_one_async(self, img, view='top'):
-    #     if view == 'top': # top view
-    #         sub_detector1 = self.top1_subdetector
-    #         sub_detector2 = self.top2_subdetector
-    #     else: # front view
-    #         sub_detector1 = self.front1_subdetector
-    #         sub_detector2 = self.front2_subdetector
-
-    #     ### openvino async_mode ###
-    #     exec_net1, img_info1 = sub_detector1.inference_async(img)
-    #     exec_net2, img_info2 = sub_detector2.inference_async(img)
-
-    #     return exec_net1, exec_net2, img_info1
-
-    # def _detect_one_wait(self, exec_net1, exec_net2, img_info, view='top'):
-    #     if view == 'top': # top view
-    #         sub_detector1 = self.top1_subdetector
-    #         sub_detector2 = self.top2_subdetector
-    #     else: # front view
-    #         sub_detector1 = self.front1_subdetector
-    #         sub_detector2 = self.front2_subdetector
-
-    #     all_preds = []
-    #     while True:
-    #         if not exec_net1.requests[0].wait() and not exec_net2.requests[0].wait():
-    #             res1 = exec_net1.requests[0].output_blobs[sub_detector1.onode].buffer
-    #             res2 = exec_net2.requests[0].output_blobs[sub_detector2.onode].buffer
-
-    #             import time
-    #             outputs1 = demo_postprocess(res1, sub_detector1.input_shape, p6=False)
-    #             outputs2 = demo_postprocess(res2, sub_detector2.input_shape, p6=False)
-
-    #             outputs1 = postprocess(
-    #                 outputs1, sub_detector1.num_classes, sub_detector1.conf_thresh,
-    #                 sub_detector1.nms_thresh, class_agnostic=True)
-    #             outputs2 = postprocess(
-    #                 outputs2, sub_detector2.num_classes, sub_detector2.conf_thresh,
-    #                 sub_detector2.nms_thresh, class_agnostic=True)
-
-    #             if outputs1[0] is not None:
-    #                 preds1 = outputs1[0]
-    #                 preds1[:, 6] += self.offset_cls_idx[0]
-    #                 all_preds.append(preds1)
-    #             if outputs2[0] is not None:
-    #                 preds2 = outputs2[0]
-    #                 preds2[:, 6] += self.offset_cls_idx[1]
-    #                 all_preds.append(preds2)
-
-    #             if len(all_preds) > 0:
-    #                 all_preds = np.concatenate(all_preds)
-    #             else:
-    #                 all_preds = np.zeros((1, 7))
-
-    #             # merge same classes from model 2
-    #             for r, pred in enumerate(all_preds):
-    #                 cls_id = int(pred[-1])
-    #                 if cls_id in self.repeat_cls2_ids:
-    #                     all_preds[r, -1] = self.cls2tocls1[cls_id]
-
-    #             # restrict object number for each class
-    #             all_preds = self._apply_detection_constraints(all_preds)
-
-    #             # remap to original image scale
-    #             ratio = img_info['ratio'] # all ways same?
-    #             bboxes = all_preds[:, :4] / ratio
-    #             cls = all_preds[:, 6]
-    #             scores = all_preds[:, 4] * all_preds[:, 5]
-
-    #             return bboxes, cls, scores
-
     def inference(self, img_top, img_side):
         """
         Given input arrays for two view, need to generate and save 
@@ -262,34 +194,31 @@ class Detector:
 
         return [top_bboxes, top_cls_ids, top_labels, top_scores], [side_bboxes, side_cls_ids, side_labels, side_scores]
 
-    # def inference_async(self, img_top, img_front):
-    #     """
-    #     todo Given input arrays for two view, need to generate and save the corresponding detection results
-    #         in the specific data structure.
-    #     Args:
-    #     img_top: img array of H x W x C for the top view
-    #     img_front: img_array of H x W x C for the front view
+    def inference_multithread(self, img_top, img_side):
+        """
+        Given input arrays for two view, need to generate and save the corresponding detection results
+            in the specific data structure.
+        Args:
+        img_top: img array of H x W x C for the top view
+        img_side: img_array of H x W x C for the side view
 
-    #     Returns:
-    #     prediction results for the two images
-    #     """
+        Returns:
+        prediction results for the two images
+        """
 
-    #     ### Async mode ###
-    #     exec_net1, exec_net2, img_info1 = self._detect_one_async(img_top, view='top')
-    #     exec_net3, exec_net4, img_info2 = self._detect_one_async(img_front, view='front')
+        # creat detector thread and segmentor thread
+        tdetTop = ThreadWithReturnValue(target = self._detect_one, args = (img_top, 'top',))
+        tdetSide = ThreadWithReturnValue(target = self._detect_one, args = (img_side, 'side',))
+        # start()
+        tdetTop.start()
+        tdetSide.start()
+        # join()
+        top_bboxes, top_cls_ids, top_scores = tdetTop.join()
+        side_bboxes, side_cls_ids, side_scores = tdetSide.join()
 
-    #     top_bboxes, top_cls_ids, top_scores = self._detect_one_wait(exec_net1, exec_net2, img_info1, view='top')
-    #     front_bboxes, front_cls_ids, front_scores = self._detect_one_wait(exec_net3, exec_net4, img_info2, view='front')
+        # get class label
+        top_labels = [self.all_classes[int(i)-1] for i in top_cls_ids]
+        side_labels = [self.all_classes[int(i)-1] for i in side_cls_ids]
 
-    #     # get class string
-    #     top_cls_ids = [ self.classes[int(x)] for x in top_cls_ids ]
-    #     front_cls_ids = [ self.classes[int(x)] for x in front_cls_ids ]
-
-    #     # return [], []
-    #     return [top_bboxes, top_cls_ids, top_scores], [front_bboxes, front_cls_ids, front_scores]
-
-    # def inference_async_api(self, img_top, img_front):
-    #     top_det_results, front_det_results = \
-    #         self.inference_async(img_top, img_front)
-
-    #     return top_det_results, front_det_results
+        # return [], []
+        return [top_bboxes, top_cls_ids, top_labels, top_scores], [side_bboxes, side_cls_ids, side_labels, side_scores]
