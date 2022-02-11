@@ -27,6 +27,28 @@ from thread_argument import ThreadWithReturnValue
 from openvino.inference_engine import IECore as Core
 
 
+terms = [
+    "noise_action",
+    "put_take",
+    "adjust_rider",
+]
+annotation_dir="C:\\Users\\kminemur\DSI-1867"
+frame_dict = {}
+import os
+if os.path.exists(os.path.join(annotation_dir, 'action_recognition\labels', f'streams_demo.txt')):
+    with open(os.path.join(annotation_dir, 'action_recognition\labels', f'streams_demo.txt'), 'r') as f:
+        all_text = f.read()
+        for line in all_text.split('\n')[:-1]:
+            frame_id, frame_label = line.split()
+            if frame_label in '8':
+                frame_dict[frame_id] = terms[2]
+            elif frame_label in ['4','6','7','9']:
+                frame_dict[frame_id] = terms[1]
+            else:
+                frame_dict[frame_id] = terms[0]
+
+
+
 def build_argparser():
     parser = ArgumentParser(add_help=False)
     args = parser.add_argument_group('Options')
@@ -105,13 +127,13 @@ def main():
         if not ret_top or not ret_side:
             break
         else:
-            # ''' The object detection module need to generate detection results(for the current frame) '''
-            # top_det_results, side_det_results = detector.inference(
-            #         img_top = frame_top, img_side = frame_side)
+            ''' The object detection module need to generate detection results(for the current frame) '''
+            top_det_results, side_det_results = detector.inference(
+                    img_top = frame_top, img_side = frame_side)
 
             # ''' The temporal segmentation module need to self judge and generate segmentation results for all historical frames '''
             # if(args.mode == "multiview"):
-            #     top_seg_results, side_seg_results = segmentor.inference(
+            #     top_seg_results, side_seg_results = segmentor.inference_async_api(
             #             buffer_top = frame_top,
             #             buffer_side = frame_side,
             #             frame_index = frame_counter)
@@ -128,33 +150,38 @@ def main():
             #     if(len(top_seg_results) == 0):
             #         continue
 
-            # creat detector thread and segmentor thread
-            tdetector = ThreadWithReturnValue(
-                target=detector.inference_multithread,
-                args=(frame_top, frame_side,))
-            if(args.mode == "multiview"): # mobilenet
-                tsegmentor = ThreadWithReturnValue(
-                    target=segmentor.inference_async_api,
-                    args=(frame_top, frame_side, frame_counter,))
-            else: # mstcn
-                buffer1.append(cv2.cvtColor(frame_top, cv2.COLOR_BGR2RGB))
-                buffer2.append(cv2.cvtColor(frame_side, cv2.COLOR_BGR2RGB))
-                tsegmentor = ThreadWithReturnValue(
-                    target=segmentor.inference,
-                    args=(buffer1, buffer2, frame_counter,))
-            # start()
-            tdetector.start()
-            tsegmentor.start()
-            # join()
-            detector_result = tdetector.join()
-            top_det_results, side_det_results = detector_result[0], detector_result[1]
-            segmentor_result = tsegmentor.join()
-            if(args.mode == "multiview"):
-                top_seg_results, side_seg_results = segmentor_result[0], segmentor_result[1]
-            else:
-                if(len(segmentor_result) == 0):
-                    continue
-                top_seg_results, side_seg_results = segmentor_result, segmentor_result
+            # load segment gt
+            imgName = f"frame{frame_counter:05d}.jpg"
+            side_seg_results = frame_dict[imgName]
+            top_seg_results = side_seg_results
+
+            # # creat detector thread and segmentor thread
+            # tdetector = ThreadWithReturnValue(
+            #     target=detector.inference_multithread,
+            #     args=(frame_top, frame_side,))
+            # if(args.mode == "multiview"): # mobilenet
+            #     tsegmentor = ThreadWithReturnValue(
+            #         target=segmentor.inference_async_api,
+            #         args=(frame_top, frame_side, frame_counter,))
+            # else: # mstcn
+            #     buffer1.append(cv2.cvtColor(frame_top, cv2.COLOR_BGR2RGB))
+            #     buffer2.append(cv2.cvtColor(frame_side, cv2.COLOR_BGR2RGB))
+            #     tsegmentor = ThreadWithReturnValue(
+            #         target=segmentor.inference,
+            #         args=(buffer1, buffer2, frame_counter,))
+            # # start()
+            # tdetector.start()
+            # tsegmentor.start()
+            # # join()
+            # detector_result = tdetector.join()
+            # top_det_results, side_det_results = detector_result[0], detector_result[1]
+            # segmentor_result = tsegmentor.join()
+            # if(args.mode == "multiview"):
+            #     top_seg_results, side_seg_results = segmentor_result[0], segmentor_result[1]
+            # else:
+            #     if(len(segmentor_result) == 0):
+            #         continue
+            #     top_seg_results, side_seg_results = segmentor_result, segmentor_result
 
             ''' The score evaluation module need to merge the results of the two modules and generate the scores '''
             state, scoring, keyframe = evaluator.inference(
