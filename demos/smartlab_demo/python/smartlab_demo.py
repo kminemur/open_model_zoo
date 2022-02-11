@@ -152,18 +152,18 @@ def main():
 
             # creat detector thread and segmentor thread
             tdetector = ThreadWithReturnValue(
-                target=detector.inference_multithread,
-                args=(frame_top, frame_side,))
+                target = detector.inference_multithread,
+                args = (frame_top, frame_side,))
             if(args.mode == "multiview"): # mobilenet
                 tsegmentor = ThreadWithReturnValue(
-                    target=segmentor.inference_async_api,
-                    args=(frame_top, frame_side, frame_counter,))
+                    target = segmentor.inference_async_api,
+                    args = (frame_top, frame_side, frame_counter,))
             else: # mstcn
                 buffer1.append(cv2.cvtColor(frame_top, cv2.COLOR_BGR2RGB))
                 buffer2.append(cv2.cvtColor(frame_side, cv2.COLOR_BGR2RGB))
                 tsegmentor = ThreadWithReturnValue(
-                    target=segmentor.inference,
-                    args=(buffer1, buffer2, frame_counter,))
+                    target = segmentor.inference,
+                    args = (buffer1, buffer2, frame_counter,))
             # start()
             tdetector.start()
             tsegmentor.start()
@@ -180,12 +180,12 @@ def main():
 
             ''' The score evaluation module need to merge the results of the two modules and generate the scores '''
             state, scoring, keyframe = evaluator.inference(
-                    top_det_results=top_det_results,
-                    side_det_results=side_det_results,
-                    action_seg_results=top_seg_results,
-                    frame_top=frame_top,
-                    frame_side=frame_side,
-                    frame_counter=frame_counter)
+                    top_det_results = top_det_results,
+                    side_det_results = side_det_results,
+                    action_seg_results = top_seg_results,
+                    frame_top = frame_top,
+                    frame_side = frame_side,
+                    frame_counter = frame_counter)
 
             current_time=time.time()
             current_frame = frame_counter

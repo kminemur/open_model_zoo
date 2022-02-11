@@ -146,6 +146,9 @@ class Detector:
             if not hasattr(sub_detector, 'is_cascaded'):
                 outputs = sub_detector.inference(img)
             else:
+                if len(all_preds) == 0:
+                    continue
+
                 parent_cat = sub_detector.parent_cat
                 parent_id = glb_subdet.detcls2id[parent_cat]
                 parent_roi = self._get_parent_roi(all_preds[-1], parent_id)
@@ -154,13 +157,18 @@ class Detector:
                     outputs = sub_detector.inference_in(img, parent_roi)
                 else:
                     outputs[0] = None
+
             if outputs[0] is not None:
                 preds = outputs[0] # work if bsize = 1
             else:
                 continue
             all_preds.append(preds)
 
-        all_preds = np.concatenate(all_preds)
+        if len(all_preds) > 0:
+            all_preds = np.concatenate(all_preds)
+        else:
+            all_preds = np.zeros((1, 7))
+
         for r, pred in enumerate(all_preds):
             cls_id = int(pred[-1])
             all_preds[r, -1] = cls_id
