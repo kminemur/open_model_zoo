@@ -102,10 +102,10 @@ def main():
         Process the video.
     """
     cap_top = cv2.VideoCapture(args.topview)
-    if not cap_top.isOpened(): 
+    if not cap_top.isOpened():
         raise ValueError(f"Can't read an video or frame from {args.topview}")
     cap_side = cv2.VideoCapture(args.sideview)
-    if not cap_side.isOpened(): 
+    if not cap_side.isOpened():
         raise ValueError(f"Can't read an video or frame from {args.sideview}")
 
     old_time = time.time()
@@ -135,8 +135,8 @@ def main():
                     target = segmentor.inference_async_api,
                     args = (frame_top, frame_side, frame_counter,))
             else: # mstcn
-                buffer1.append(cv2.cvtColor(frame_top, cv2.COLOR_BGR2RGB))
-                buffer2.append(cv2.cvtColor(frame_side, cv2.COLOR_BGR2RGB))
+                buffer1.append(frame_top)
+                buffer2.append(frame_side)
                 tsegmentor = ThreadWithReturnValue(
                     target = segmentor.inference,
                     args = (buffer1, buffer2, frame_counter,))
