@@ -280,36 +280,3 @@ class SegmentorMstcn:
             temporal_logits = softmax(temporal_logits[-1], 1)  # 1x16xN
             temporal_logits = temporal_logits.transpose((0, 2, 1)).squeeze(axis=0)
             self.TemporalLogits = np.concatenate([self.TemporalLogits, temporal_logits], axis=0)
-
-
-if __name__ == '__main__':
-    ie = IECore()
-    segmentor = SegmentorMstcn(ie, "CPU", "E:\\models\\efficientnetb0\\efficientnet-b0-pytorch.xml",
-                               "E:\\models\\mstcn_2560\\inferred_model.xml")
-    frame_counter = 0  # Frame index counter
-    buffer1 = deque(maxlen=1000)  # Array buffer
-    buffer2 = deque(maxlen=1000)
-
-    cap1 = cv2.VideoCapture("E:\\video\\P03_A5130001992103255012_2021-10-18_10-19-30_1.mp4")
-    cap2 = cv2.VideoCapture("E:\\video\\P03_A5130001992103255012_2021-10-18_10-19-30_2.mp4")
-    while cap1.isOpened() and cap2.isOpened():
-        ret1, frame1 = cap1.read()  # frame:480 x 640 x 3
-        ret2, frame2 = cap2.read()  # frame:480 x 640 x 3
-        if ret1 and ret2:
-            buffer1.append(cv2.cvtColor(frame1, cv2.COLOR_BGR2RGB))
-            buffer2.append(cv2.cvtColor(frame2, cv2.COLOR_BGR2RGB))
-            # buffer1.append(frame1)
-            # buffer2.append(frame2)
-            frame_counter += 1
-            start = time.time()
-            frame_predictions = segmentor.inference(
-                buffer_top=buffer1,
-                buffer_side=buffer2,
-                frame_index=frame_counter)
-            end = time.time()
-            print(1 / (end - start))
-            print(frame_counter)
-            print("Frame predictions:", frame_predictions)
-        else:
-            print("Finished!")
-            break
