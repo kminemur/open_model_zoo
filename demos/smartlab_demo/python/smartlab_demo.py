@@ -181,6 +181,7 @@ def main():
                     side_det_results = side_det_results,
                     scoring = scoring,
                     state = state,
+                    keyframe = keyframe,
                     frame_counter = frame_counter,
                     fps = fps)
 

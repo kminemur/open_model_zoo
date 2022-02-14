@@ -33,8 +33,8 @@ class Display:
         cv2.putText(frame_side, top_seg_results, (700, 80), cv2.FONT_HERSHEY_SIMPLEX, color = (0, 0, 255), fontScale = 1.5, thickness = 3)
 
         #display frame_number at top left corner
-        cv2.putText(frame_top, f"frame{frame_counter: 6d}", (50, 80), cv2.FONT_HERSHEY_SIMPLEX, color=(0, 0, 255), fontScale = 1.5, thickness = 3)
-        cv2.putText(frame_side, f"frame{frame_counter: 6d}", (50, 80), cv2.FONT_HERSHEY_SIMPLEX, color=(0, 0, 255), fontScale = 1.5, thickness = 3)
+        # cv2.putText(frame_top, f"frame{frame_counter: 6d}", (50, 80), cv2.FONT_HERSHEY_SIMPLEX, color=(0, 0, 255), fontScale = 1.5, thickness = 3)
+        # cv2.putText(frame_side, f"frame{frame_counter: 6d}", (50, 80), cv2.FONT_HERSHEY_SIMPLEX, color=(0, 0, 255), fontScale = 1.5, thickness = 3)
 
         #display FPS at top left corner
         cv2.putText(frame_top, f"FPS: {fps: .2f}", (50, 160), cv2.FONT_HERSHEY_SIMPLEX, color=(0, 0, 255), fontScale = 1.5, thickness = 3)
