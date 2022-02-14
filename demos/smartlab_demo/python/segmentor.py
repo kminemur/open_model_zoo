@@ -17,7 +17,11 @@
 import cv2
 import numpy as np
 import logging as log
+from collections import deque
 from scipy.special import softmax
+from openvino.inference_engine import IECore, StatusCode
+import time
+from PIL import Image
 
 
 class Segmentor:
@@ -142,7 +146,6 @@ class SegmentorMstcn:
             "background",
             "noise_action",
             "remove_support_sleeve",
-            "remove_pointer_sleeve",
             "adjust_rider",
             "adjust_nut",
             "adjust_balancing",
@@ -154,7 +157,6 @@ class SegmentorMstcn:
             "take_left",
             "take_right",
             "install_support_sleeve",
-            "install_pointer_sleeve",
         ]
 
         self.EmbedBufferTop = np.zeros((1280, 0))
@@ -167,16 +169,20 @@ class SegmentorMstcn:
         self.EmbedWindowStride = 1
         self.EmbedWindowAtrous = 3
         self.TemporalLogits = np.zeros((0, len(self.ActionTerms)))
+        self.his_fea = []
 
-        net = ie.read_network(encoder_path)
+        net = ie.read_network(self.efficientNet_path)
+        # net.reshape({next(iter(net.input_info)): (
+        #     self.EmbedBatchSize, 3, self.EmbedWindowLength, self.ImgSizeWidth, self.ImgSizeHeight)})
+        # net.add_outputs("RGB/inception_efficientNet/Logits/AvgPool3D")
         net.add_outputs("Flatten_237/Reshape")
 
-        self.encoder = ie.load_network(network=net, device_name=device)
-        self.encoder_input_keys = list(self.encoder.input_info.keys())
-        self.encoder_output_key = list(self.encoder.outputs.keys())
+        self.efficientNet = ie.load_network(network=net, device_name="CPU", num_requests=2)
+        self.efficientNet_input_keys = list(self.efficientNet.input_info.keys())
+        self.efficientNet_output_key = list(self.efficientNet.outputs.keys())
 
-        self.mstcn_net = ie.read_network(mstcn_path)
-        self.mstcn = ie.load_network(network=self.mstcn_net, device_name=device)
+        self.mstcn_net = ie.read_network(self.mstcn_path)
+        self.mstcn = ie.load_network(network=self.mstcn_net, device_name="CPU")
         self.mstcn_input_keys = list(self.mstcn.input_info.keys())
         self.mstcn_output_key = list(self.mstcn.outputs.keys())
         self.mstcn_net.reshape({'input': (1, 2560, 1)})
@@ -197,59 +203,50 @@ class SegmentorMstcn:
                  length of predictions == frame_index()
         """
         ### run encoder ###
-        self.EmbedBufferTop = self.feature_embedding(
+        self.feature_embedding(
             img_buffer=buffer_top,
             embedding_buffer=self.EmbedBufferTop,
-            frame_index=frame_index)
-        self.EmbedBufferSide = self.feature_embedding(
-            img_buffer=buffer_side,
-            embedding_buffer=self.EmbedBufferSide,
-            frame_index=frame_index)
+            isTop=0)
+        self.feature_embedding(
+            img_buffer=buffer_front,
+            embedding_buffer=self.EmbedBufferFront,
+            isTop=1)
 
-        ### run mstcn++ only batch size 1###
-        if min(self.EmbedBufferTop.shape[-1], self.EmbedBufferSide.shape[-1]) > 0:
-            self.action_segmentation()
+        while True:
+            if self.efficientNet.requests[0].wait(0) == StatusCode.OK and self.efficientNet.requests[1].wait(
+                0) == StatusCode.OK:
+                out_logits_0 = self.efficientNet.requests[0].output_blobs[
+                    self.efficientNet_output_key[0]].buffer.transpose(1, 0)
+                out_logits_1 = self.efficientNet.requests[1].output_blobs[
+                    self.efficientNet_output_key[0]].buffer.transpose(1, 0)
+                self.EmbedBufferTop = out_logits_0
+                self.EmbedBufferFront = out_logits_1
+                self.embedding_buffer = np.concatenate([out_logits_0, out_logits_1],
+                                                       axis=1)  # ndarray: C x num_embedding
 
-        # ### get label ###
-        valid_index = self.TemporalLogits.shape[0]
-        if valid_index == 0:
-            return []
-        else:
-            frame_predictions = [self.ActionTerms[i] for i in np.argmax(self.TemporalLogits, axis=1)]
-            frame_predictions = ["background" for i in range(self.EmbedWindowLength - 1)] + frame_predictions
+                ### run mstcn++ ###
+                self.action_segmentation()
 
-        return frame_predictions[-1]
+                # ### get label ###
+                valid_index = self.TemporalLogits.shape[0]
+                if valid_index == 0:
+                    return []
+                else:
+                    frame_predictions = [self.ActionTerms[i] for i in np.argmax(self.TemporalLogits, axis=1)]
+                    frame_predictions = ["background" for i in range(self.EmbedWindowLength - 1)] + frame_predictions
 
-    def feature_embedding(self, img_buffer, embedding_buffer, frame_index):
+                return frame_predictions[-1]
+
+    def feature_embedding(self, img_buffer, embedding_buffer, isTop=0):
         # minimal temporal length for processor
-        min_t = (self.EmbedWindowLength - 1) * self.EmbedWindowAtrous
 
-        if frame_index > min_t:
-            num_embedding = embedding_buffer.shape[-1]
-            img_buffer = list(img_buffer)
-            curr_t = self.EmbedWindowStride * num_embedding + (self.EmbedWindowLength - 1) * self.EmbedWindowAtrous
-            while curr_t < frame_index:
-                # absolute index in temporal shaft
-                start_index = self.EmbedWindowStride * num_embedding
-
-                if frame_index > len(img_buffer):
-                    # absolute index in buffer shaft
-                    start_index = start_index - (frame_index - len(img_buffer))
-
-                input_data = [
-                    [cv2.resize(img_buffer[start_index + i * self.EmbedWindowAtrous],
-                                (self.ImgSizeHeight, self.ImgSizeWidth)) for i in range(self.EmbedWindowLength)]
-                    for j in range(self.EmbedBatchSize)]
-
-                input_data = np.asarray(input_data).squeeze().transpose(2, 0, 1)
-                out_logits = self.encoder.infer(
-                    inputs={self.encoder_input_keys[0]: input_data})[self.encoder_output_key[0]]
-                out_logits = out_logits.transpose(1, 0)
-                embedding_buffer = np.concatenate(
-                    [embedding_buffer, out_logits], axis=1)  # ndarray: C x num_embedding
-                curr_t += self.EmbedWindowStride
-
-        return embedding_buffer
+        num_embedding = embedding_buffer.shape[-1]
+        img_buffer = list(img_buffer)
+        # absolute index in temporal shaft
+        start_index = self.EmbedWindowStride * num_embedding
+        input_data = np.array(Image.fromarray(img_buffer[start_index]).resize((224, 224), Image.BILINEAR))
+        input_data = np.asarray(input_data).squeeze().transpose(2, 0, 1)
+        self.efficientNet.requests[isTop].async_infer({self.efficientNet_input_keys[0]: input_data})
 
     def action_segmentation(self):
         # read buffer
@@ -257,15 +254,15 @@ class SegmentorMstcn:
         embed_buffer_front = self.EmbedBufferSide
         batch_size = self.SegBatchSize
         start_index = self.TemporalLogits.shape[0]
-        end_index = min(embed_buffer_top.shape[-1], embed_buffer_front.shape[-1])
+        end_index = start_index + 1
         num_batch = (end_index - start_index) // batch_size
         if num_batch < 0:
             log.debug("Waiting for the next frame ...")
         elif num_batch == 0:
             log.debug(f"start_index: {start_index} end_index: {end_index}")
 
-            unit1 = embed_buffer_top[:, start_index:end_index]
-            unit2 = embed_buffer_front[:, start_index:end_index]
+            unit1 = embed_buffer_top
+            unit2 = embed_buffer_front
             feature_unit = np.concatenate([unit1[:, ], unit2[:, ]], axis=0)
             input_mstcn = np.expand_dims(feature_unit, 0)
 
@@ -276,6 +273,8 @@ class SegmentorMstcn:
 
             if input_mstcn.shape == (1, 2560, 1):
                 out = self.reshape_mstcn.infer(inputs=feed_dict)
+            else:
+                print('shape:', input_mstcn.shape)
             predictions = out[self.mstcn_output_key[-1]]
             self.his_fea = [out[self.mstcn_output_key[i]] for i in range(4)]
 
@@ -283,22 +282,36 @@ class SegmentorMstcn:
             temporal_logits = softmax(temporal_logits[-1], 1)  # 1x16xN
             temporal_logits = temporal_logits.transpose((0, 2, 1)).squeeze(axis=0)
             self.TemporalLogits = np.concatenate([self.TemporalLogits, temporal_logits], axis=0)
-        else:
-            for batch_idx in range(num_batch):
-                unit1 = embed_buffer_top[: , \
-                    start_index + batch_idx * batch_size: start_index + batch_idx * batch_size + batch_size]
-                unit2 = embed_buffer_front[: , \
-                    start_index + batch_idx * batch_size:start_index + batch_idx * batch_size + batch_size]
-                feature_unit = np.concatenate([unit1[: , ], unit2[: , ]], axis=0)
-                feed_dict = {}
-                if len(self.his_fea) != 0:
-                    feed_dict = {self.mstcn_input_keys[i]: self.his_fea[i] for i in range(4)}
-                feed_dict[self.mstcn_input_keys[-1]] = feature_unit
-                out = self.mstcn.infer(inputs=feed_dict)
-                predictions = out[self.mstcn_output_key[-1]]
-                self.his_fea = [out[self.mstcn_output_key[i]] for i in range(4)]
 
-                temporal_logits = predictions[:, :, : len(self.ActionTerms), : ]  # 4x1x16xN
-                temporal_logits = softmax(temporal_logits[-1], 1)  # 1x16xN
-                temporal_logits = temporal_logits.transpose((0, 2, 1)).squeeze(axis=0)
-                self.TemporalLogits = np.concatenate([self.TemporalLogits, temporal_logits], axis=0)
+
+if __name__ == '__main__':
+    ie = IECore()
+    segmentor = SegmentorMstcn(ie, "E:\\models\\efficientnetb0\\efficientnet-b0-pytorch.xml",
+                               "E:\\models\\mstcn_2560\\inferred_model.xml")
+    frame_counter = 0  # Frame index counter
+    buffer1 = deque(maxlen=1000)  # Array buffer
+    buffer2 = deque(maxlen=1000)
+
+    cap1 = cv2.VideoCapture("E:\\video\\P03_A5130001992103255012_2021-10-18_10-19-30_1.mp4")
+    cap2 = cv2.VideoCapture("E:\\video\\P03_A5130001992103255012_2021-10-18_10-19-30_2.mp4")
+    while cap1.isOpened() and cap2.isOpened():
+        ret1, frame1 = cap1.read()  # frame:480 x 640 x 3
+        ret2, frame2 = cap2.read()  # frame:480 x 640 x 3
+        if ret1 and ret2:
+            buffer1.append(cv2.cvtColor(frame1, cv2.COLOR_BGR2RGB))
+            buffer2.append(cv2.cvtColor(frame2, cv2.COLOR_BGR2RGB))
+            # buffer1.append(frame1)
+            # buffer2.append(frame2)
+            frame_counter += 1
+            start = time.time()
+            frame_predictions = segmentor.inference(
+                buffer_top=buffer1,
+                buffer_front=buffer2,
+                frame_index=frame_counter)
+            end = time.time()
+            print(1 / (end - start))
+            print(frame_counter)
+            print("Frame predictions:", frame_predictions)
+        else:
+            print("Finished!")
+            break
