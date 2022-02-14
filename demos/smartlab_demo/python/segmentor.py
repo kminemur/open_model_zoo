@@ -34,17 +34,17 @@ class Segmentor:
 
         # Side encoder
         net = ie.read_network(backbone_path)
-        self.encSide = ie.load_network(network = net, device_name=device)
+        self.encSide = ie.load_network(network=net, device_name=device)
         self.encSide_input_keys = list(self.encSide.input_info.keys())
         self.encSide_output_key = list(self.encSide.outputs.keys())
         # Top encoder
         net = ie.read_network(backbone_path)
-        self.encTop = ie.load_network(network=net, device_name = device)
+        self.encTop = ie.load_network(network=net, device_name=device)
         self.encTop_input_keys = list(self.encTop.input_info.keys())
         self.encTop_output_key = list(self.encTop.outputs.keys())
         # Decoder
         net = ie.read_network(classifier_path)
-        self.classifier = ie.load_network(network = net, device_name = device)
+        self.classifier = ie.load_network(network=net, device_name=device)
         self.classifier_input_keys = list(self.classifier.input_info.keys())
         self.classifier_output_key = list(self.classifier.outputs.keys())
 
@@ -62,10 +62,10 @@ class Segmentor:
         """
 
         ### preprocess ###
-        buffer_side = buffer_side[120:, :, :] # remove date characters
-        buffer_top = buffer_top[120:, :, :] # remove date characters
-        buffer_side = cv2.resize(buffer_side, (224, 224), interpolation = cv2.INTER_LINEAR)
-        buffer_top = cv2.resize(buffer_top, (224, 224), interpolation = cv2.INTER_LINEAR)
+        buffer_side = buffer_side[120:, :, :]  # remove date characters
+        buffer_top = buffer_top[120:, :, :]  # remove date characters
+        buffer_side = cv2.resize(buffer_side, (224, 224), interpolation=cv2.INTER_LINEAR)
+        buffer_top = cv2.resize(buffer_top, (224, 224), interpolation=cv2.INTER_LINEAR)
         buffer_side = buffer_side / 255
         buffer_top = buffer_top / 255
 
@@ -75,13 +75,13 @@ class Segmentor:
         ### run ###
         out = self.encSide.infer(
             inputs={self.encSide_input_keys[0]: buffer_side,
-            self.encSide_input_keys[1]: self.shifted_tesor_side})
+                    self.encSide_input_keys[1]: self.shifted_tesor_side})
         feature_vector_side = out[self.encSide_output_key[0]]
         self.shifted_tesor_side = out[self.encSide_output_key[1]]
 
         out = self.encTop.infer(
             inputs={self.encTop_input_keys[0]: buffer_top,
-            self.encTop_input_keys[1]: self.shifted_tesor_top})
+                    self.encTop_input_keys[1]: self.shifted_tesor_top})
         feature_vector_top = out[self.encTop_output_key[0]]
         self.shifted_tesor_top = out[self.encTop_output_key[1]]
 
@@ -98,10 +98,10 @@ class Segmentor:
 
     def inference_async(self, buffer_top, buffer_side, frame_index):
         ### preprocess ###
-        buffer_side = buffer_side[120:, :, :] # remove date characters
-        buffer_top = buffer_top[120:, :, :] # remove date characters
-        buffer_side = cv2.resize(buffer_side, (224, 224), interpolation = cv2.INTER_LINEAR)
-        buffer_top = cv2.resize(buffer_top, (224, 224), interpolation = cv2.INTER_LINEAR)
+        buffer_side = buffer_side[120:, :, :]  # remove date characters
+        buffer_top = buffer_top[120:, :, :]  # remove date characters
+        buffer_side = cv2.resize(buffer_side, (224, 224), interpolation=cv2.INTER_LINEAR)
+        buffer_top = cv2.resize(buffer_top, (224, 224), interpolation=cv2.INTER_LINEAR)
         buffer_side = buffer_side / 255
         buffer_top = buffer_top / 255
 
@@ -110,10 +110,10 @@ class Segmentor:
 
         ### async ###
         self.encSide.requests[0].async_infer(inputs={self.encSide_input_keys[0]: buffer_side,
-            self.encSide_input_keys[1]: self.shifted_tesor_side})
+                                                     self.encSide_input_keys[1]: self.shifted_tesor_side})
 
         self.encTop.requests[0].async_infer(inputs={self.encTop_input_keys[0]: buffer_top, \
-            self.encTop_input_keys[1]: self.shifted_tesor_top})
+                                                    self.encTop_input_keys[1]: self.shifted_tesor_top})
 
         while True:
             if not self.encSide.requests[0].wait() and not self.encTop.requests[0].wait():
@@ -140,8 +140,9 @@ class Segmentor:
 
         return predicrted_top, predicrted_side
 
+
 class SegmentorMstcn:
-    def __init__(self, ie, device, encoder_path, mstcn_path):
+    def __init__(self, ie, device, efficientNet_path, mstcn_path):
         self.ActionTerms = [
             "background",
             "noise_action",
@@ -171,17 +172,14 @@ class SegmentorMstcn:
         self.TemporalLogits = np.zeros((0, len(self.ActionTerms)))
         self.his_fea = []
 
-        net = ie.read_network(self.efficientNet_path)
-        # net.reshape({next(iter(net.input_info)): (
-        #     self.EmbedBatchSize, 3, self.EmbedWindowLength, self.ImgSizeWidth, self.ImgSizeHeight)})
-        # net.add_outputs("RGB/inception_efficientNet/Logits/AvgPool3D")
+        net = ie.read_network(efficientNet_path)
         net.add_outputs("Flatten_237/Reshape")
 
         self.efficientNet = ie.load_network(network=net, device_name="CPU", num_requests=2)
         self.efficientNet_input_keys = list(self.efficientNet.input_info.keys())
         self.efficientNet_output_key = list(self.efficientNet.outputs.keys())
 
-        self.mstcn_net = ie.read_network(self.mstcn_path)
+        self.mstcn_net = ie.read_network(mstcn_path)
         self.mstcn = ie.load_network(network=self.mstcn_net, device_name="CPU")
         self.mstcn_input_keys = list(self.mstcn.input_info.keys())
         self.mstcn_output_key = list(self.mstcn.outputs.keys())
@@ -208,8 +206,8 @@ class SegmentorMstcn:
             embedding_buffer=self.EmbedBufferTop,
             isTop=0)
         self.feature_embedding(
-            img_buffer=buffer_front,
-            embedding_buffer=self.EmbedBufferFront,
+            img_buffer=buffer_side,
+            embedding_buffer=self.EmbedBufferSide,
             isTop=1)
 
         while True:
@@ -220,7 +218,7 @@ class SegmentorMstcn:
                 out_logits_1 = self.efficientNet.requests[1].output_blobs[
                     self.efficientNet_output_key[0]].buffer.transpose(1, 0)
                 self.EmbedBufferTop = out_logits_0
-                self.EmbedBufferFront = out_logits_1
+                self.EmbedBufferSide = out_logits_1
                 self.embedding_buffer = np.concatenate([out_logits_0, out_logits_1],
                                                        axis=1)  # ndarray: C x num_embedding
 
@@ -251,7 +249,7 @@ class SegmentorMstcn:
     def action_segmentation(self):
         # read buffer
         embed_buffer_top = self.EmbedBufferTop
-        embed_buffer_front = self.EmbedBufferSide
+        embed_buffer_side = self.EmbedBufferSide
         batch_size = self.SegBatchSize
         start_index = self.TemporalLogits.shape[0]
         end_index = start_index + 1
@@ -262,7 +260,7 @@ class SegmentorMstcn:
             log.debug(f"start_index: {start_index} end_index: {end_index}")
 
             unit1 = embed_buffer_top
-            unit2 = embed_buffer_front
+            unit2 = embed_buffer_side
             feature_unit = np.concatenate([unit1[:, ], unit2[:, ]], axis=0)
             input_mstcn = np.expand_dims(feature_unit, 0)
 
@@ -278,7 +276,7 @@ class SegmentorMstcn:
             predictions = out[self.mstcn_output_key[-1]]
             self.his_fea = [out[self.mstcn_output_key[i]] for i in range(4)]
 
-            temporal_logits = predictions[:, :, : len(self.ActionTerms), : ] # 4x1x16xN
+            temporal_logits = predictions[:, :, : len(self.ActionTerms), :]  # 4x1x16xN
             temporal_logits = softmax(temporal_logits[-1], 1)  # 1x16xN
             temporal_logits = temporal_logits.transpose((0, 2, 1)).squeeze(axis=0)
             self.TemporalLogits = np.concatenate([self.TemporalLogits, temporal_logits], axis=0)
@@ -286,7 +284,7 @@ class SegmentorMstcn:
 
 if __name__ == '__main__':
     ie = IECore()
-    segmentor = SegmentorMstcn(ie, "E:\\models\\efficientnetb0\\efficientnet-b0-pytorch.xml",
+    segmentor = SegmentorMstcn(ie, "CPU", "E:\\models\\efficientnetb0\\efficientnet-b0-pytorch.xml",
                                "E:\\models\\mstcn_2560\\inferred_model.xml")
     frame_counter = 0  # Frame index counter
     buffer1 = deque(maxlen=1000)  # Array buffer
@@ -306,7 +304,7 @@ if __name__ == '__main__':
             start = time.time()
             frame_predictions = segmentor.inference(
                 buffer_top=buffer1,
-                buffer_front=buffer2,
+                buffer_side=buffer2,
                 frame_index=frame_counter)
             end = time.time()
             print(1 / (end - start))
