@@ -1,0 +1,33 @@
+INFO:app.run:Output log dir: .
+INFO:app.run:Creating pipeline:
+ Algorithm: DefaultQuantization
+ Parameters:
+	preset                     : performance
+	stat_subset_size           : 300
+	shuffle_data               : False
+	target_device              : CPU
+	model_type                 : None
+	dump_intermediate_model    : False
+	exec_log_dir               : .
+ ===========================================================================
+INFO:app.run:Output log dir: .
+INFO:app.run:Creating pipeline:
+ Algorithm: DefaultQuantization
+ Parameters:
+	preset                     : performance
+	stat_subset_size           : 300
+	shuffle_data               : False
+	target_device              : CPU
+	model_type                 : None
+	dump_intermediate_model    : False
+	exec_log_dir               : .
+ ===========================================================================
+INFO:compression.statistics.collector:Start computing statistics for algorithms : DefaultQuantization
+INFO:compression.statistics.collector:Computing statistics finished
+INFO:compression.pipeline.pipeline:Start algorithm: DefaultQuantization
+INFO:compression.algorithms.quantization.default.algorithm:Start computing statistics for algorithm : ActivationChannelAlignment
+INFO:compression.algorithms.quantization.default.algorithm:Computing statistics finished
+INFO:compression.algorithms.quantization.default.algorithm:Start computing statistics for algorithms : MinMaxQuantization,FastBiasCorrection
+INFO:compression.algorithms.quantization.default.algorithm:Computing statistics finished
+INFO:compression.pipeline.pipeline:Finished: DefaultQuantization
+ ===========================================================================

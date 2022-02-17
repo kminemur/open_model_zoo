@@ -1,0 +1,31 @@
+{
+    /* Model parameters */
+
+    "model": {
+        "model_name": "mw-frontview-all-yolox-n_fp32_int8", // Model name
+        "model": "mw-frontview-all-yolox-n.xml", // Path to model (.xml format)
+        "weights": "mw-frontview-all-yolox-n.bin" // Path to weights (.bin format)
+    },
+
+    /* Parameters of the engine used for model inference */
+    "engine": {
+        /* Simplified mode */
+        "type": "simplified",
+        "data_source": "C:\\Users\\kminemur\\DSI-1867\\object_detection\\streams_1\\high\\images"
+    },
+
+    /* Optimization hyperparameters */
+    "compression": {
+        "target_device": "CPU",
+        "algorithms": [
+            {
+                "name": "DefaultQuantization",
+                "params": {
+                    "preset": "performance",
+                    "stat_subset_size": 300,
+                    "shuffle_data": false
+                }
+            }
+        ]
+    }
+}
