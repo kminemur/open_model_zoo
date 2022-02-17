@@ -138,6 +138,7 @@ class Detector:
             sub_detector1 = self.front1_subdetector
             sub_detector2 = self.front2_subdetector
 
+        all_preds = []
         for i, sub_detector in enumerate([sub_detector1, sub_detector2]):
             outputs, img_info = sub_detector.inference(img)
             if outputs[0] is not None:
@@ -148,6 +149,8 @@ class Detector:
 
             if i == 0:
                 all_preds = np.array(preds)
+            elif len(all_preds) == 1:
+                all_preds = np.zeros((1.7))
             else:
                 np.vstack((all_preds, preds))
 
