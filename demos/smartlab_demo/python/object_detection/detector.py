@@ -150,7 +150,7 @@ class Detector:
             if i == 0:
                 all_preds = np.array(preds)
             elif len(all_preds) == 1:
-                all_preds = np.zeros((1.7))
+                all_preds = np.zeros((1, 7))
             else:
                 np.vstack((all_preds, preds))
 
