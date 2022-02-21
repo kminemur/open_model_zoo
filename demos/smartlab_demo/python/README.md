@@ -69,9 +69,9 @@ python3 smartlab_demo.py
     -m_tm "./intel/smartlab-object-detection-0002/FP32/smartlab-object-detection-0002.xml"
     -m_fa "./intel/smartlab-object-detection-0003/FP32/smartlab-object-detection-0003.xml"
     -m_fm "./intel/smartlab-object-detection-0004/FP32/smartlab-object-detection-0004.xml"
-    --mode multiview
-    -m_en "./intel/smartlab-action-recognition-0001/smartlab-action-recognition-encoder-0001/FP32/smartlab-action-recognition-encoder-0001.xml"
-    -m_de "./intel/smartlab-action-recognition-0001/smartlab-action-recognition-decoder-0001/FP32/smartlab-action-recognition-decoder-0001.xml"
+    --mode mstcn
+    -m_en "./public/i3d-rgb-tf/i3d-rgb.frozen.xml"
+    -m_de "./intel/smartlab-sequence-modelling-0001/FP16/smartlab-sequence-modelling-0001.xml"
 ```
 
 ## Demo Output
