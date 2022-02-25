@@ -49,7 +49,7 @@ class Detector:
         #     conf 0.1; nms 0.3
         self.top1_exp = MwGlobalExp(
             num_classes = 10,
-            fp_model = fp_top_models[0],
+            model_path = fp_top_models[0],
             conf_thresh= 0.1,
             nms_thresh = 0.3,
             ie=ie,
@@ -62,7 +62,7 @@ class Detector:
         #     conf 0.1; nms 0.2
         self.top2_exp = MwGlobalExp(
             num_classes = 3,
-            fp_model = fp_top_models[1],
+            model_path = fp_top_models[1],
             conf_thresh= 0.1,
             nms_thresh = 0.2,
             ie=ie,
@@ -79,7 +79,7 @@ class Detector:
         #     conf 0.2; nms 0.3
         self.front1_exp = MwGlobalExp(
             num_classes = 10,
-            fp_model = fp_front_models[0],
+            model_path = fp_front_models[0],
             conf_thresh= 0.2,
             nms_thresh = 0.3,
             ie=ie,
@@ -92,7 +92,7 @@ class Detector:
         #     conf 0.1; nms 0.2
         self.front2_exp = MwGlobalExp(
             num_classes = 3,
-            fp_model = fp_front_models[1],
+            model_path = fp_front_models[1],
             conf_thresh= 0.1,
             nms_thresh = 0.2,
             ie=ie,
