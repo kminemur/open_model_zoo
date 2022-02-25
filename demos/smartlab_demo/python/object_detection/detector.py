@@ -154,6 +154,9 @@ class Detector:
             else:
                 np.vstack((all_preds, preds))
 
+        if len(all_preds) == 0:
+            all_preds = np.zeros((1, 7))
+
         # merge same classes from model 2
         for r, pred in enumerate(all_preds):
             cls_id = int(pred[-1])
