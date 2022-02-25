@@ -15,37 +15,59 @@
  limitations under the License.
 """
 
-# class maps
-mw_glb2bcls3 = (
-  'weights',
-  'tweezers',
-  'battery'
-)
+from copy import deepcopy
 
-mw_glb1cls10 = (
-  "balance",
-  "weights",
-  "tweezers",
-  "box",
-  "battery",
-  "tray",
-  "ruler",
-  "rider",
-  "scale",
-  "hand"
-)
+# class maps
+mw_glb1cls10 = [
+    "balance",
+    "weights",
+    "tweezers",
+    "box",
+    "battery",
+    "tray",
+    "ruler",
+    "rider",
+    "scale",
+    "hand"]
+
+mw_ruler1cls3 = [
+    "ruler",
+    "rider",
+    "roundscrew1"]
+
+mw_scale1cls4 = [
+    'scale',
+    "roundscrew2",
+    "pointerhead",
+    "pointer"]
 
 # global setting of obj-det
 class MwGlobalExp:
-    def __init__(self, num_classes, fp_model, nms_thresh, conf_thresh, ie, device):
+    def __init__(self, ie, device, num_classes, model_path,
+        nms_thresh, conf_thresh, parent_obj=''):
+
+        self.parent_cat = parent_obj
+        self.is_cascaded_det = len(parent_obj) > 0
+        self.input_size = (416, 416)
+
         if num_classes == 10:
             self.mw_classes = mw_glb1cls10
+        elif num_classes == 4:
+            self.mw_classes = mw_scale1cls4
         elif num_classes == 3:
-            self.mw_classes = mw_glb2bcls3
+            self.mw_classes = mw_ruler1cls3
         else:
             raise ValueError(f'num_classes={num_classes} is not supported, use 10 or 3')
+
+        # create reverse map of cls -> category_id
+        self.cls2id = {name: i + 1 for i, name in enumerate(self.mw_classes)}
+        # define children objects if necessary
+        if self.is_cascaded_det:
+            self.children_cats = deepcopy(self.mw_classes)
+            self.children_cats.remove(parent_obj)
+
         # define model file
-        self.fp_model = fp_model
+        self.model_path = model_path
         self.conf_thresh = conf_thresh
         self.nms_thresh = nms_thresh
         self.num_classes = num_classes
@@ -53,8 +75,7 @@ class MwGlobalExp:
         self.device = device
 
     def get_openvino_model(self):
-        net = self.ie.read_network(self.fp_model)
-
+        net = self.ie.read_network(self.model_path)
         input_name = next(iter(net.input_info))
         output_name = next(iter(net.outputs))
         net.input_info[input_name].precision = 'FP32'
@@ -65,4 +86,4 @@ class MwGlobalExp:
             input_name,
             output_name,
             (h, w),
-            self.ie.load_network(network=net, device_name=self.device))
+            self.ie.load_network(network = net, device_name = self.device))
