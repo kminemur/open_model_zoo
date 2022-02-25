@@ -34,7 +34,7 @@ mw_glb1cls10 = (
 
 # global setting of obj-det
 class MwGlobalExp:
-    def __init__(self, num_classes, fp_model, nms_thresh, conf_thresh, ie, device):
+    def __init__(self, num_classes, model_path, nms_thresh, conf_thresh, ie, device):
         if num_classes == 10:
             self.mw_classes = mw_glb1cls10
         elif num_classes == 3:
@@ -42,7 +42,7 @@ class MwGlobalExp:
         else:
             raise ValueError(f'num_classes={num_classes} is not supported, use 10 or 3')
         # define model file
-        self.fp_model = fp_model
+        self.model_path = model_path
         self.conf_thresh = conf_thresh
         self.nms_thresh = nms_thresh
         self.num_classes = num_classes
@@ -50,7 +50,7 @@ class MwGlobalExp:
         self.device = device
 
     def get_openvino_model(self):
-        net = self.ie.read_model(self.fp_model)
+        net = self.ie.read_model(self.model_path)
         compiled_model = self.ie.compile_model(model=net, device_name=self.device)
         input_name = compiled_model.inputs[0]
         output_name = compiled_model.outputs[0]
